@@ -104,6 +104,7 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
 - (BOOL)isInTransformingState;
 
 // Helpers & more
+- (void)relayoutGridHeaderView:(BOOL)animated;
 - (void)recomputeSizeAnimated:(BOOL)animated;
 - (void)relayoutItemsAnimated:(BOOL)animated;
 - (NSArray *)itemSubviews;
@@ -136,6 +137,7 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
 
 @synthesize sortingDelegate = _sortingDelegate, dataSource = _dataSource, transformDelegate = _transformDelegate, actionDelegate = _actionDelegate;
 @synthesize mainSuperView = _mainSuperView;
+@synthesize gridHeaderView = _gridHeaderView;
 @synthesize layoutStrategy = _layoutStrategy;
 @synthesize itemSpacing = _itemSpacing;
 @synthesize style = _style;
@@ -241,6 +243,7 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
     
     self.layoutStrategy = [GMGridViewLayoutStrategyFactory strategyFromType:GMGridViewLayoutVertical];
     
+    self.gridHeaderView = nil;
     self.mainSuperView = self;
     self.editing = NO;
     self.itemSpacing = 10;
@@ -291,6 +294,7 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
 {
     [self recomputeSizeAnimated:!(animation & GMGridViewItemAnimationNone)];
     [self relayoutItemsAnimated:animation & GMGridViewItemAnimationFade]; // only supported animation for now
+    [self relayoutGridHeaderView:!(animation & GMGridViewItemAnimationNone)];
     [self loadRequiredItems];
 }
 
@@ -384,6 +388,21 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
 {
     _dataSource = dataSource;
     [self reloadData];
+}
+
+- (void)setGridHeaderView:(UIView *)gridHeaderView
+{
+    if (_gridHeaderView != gridHeaderView) {
+        
+        [_gridHeaderView removeFromSuperview];
+        _gridHeaderView = gridHeaderView;
+        
+        if (gridHeaderView) {
+            [self addSubview:gridHeaderView];
+        }
+        
+        [self setNeedsLayout];
+    }
 }
 
 - (void)setMainSuperView:(UIView *)mainSuperView
@@ -1265,7 +1284,13 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
 
 - (void)recomputeSizeAnimated:(BOOL)animated
 {
-    [self.layoutStrategy setupItemSize:_itemSize andItemSpacing:self.itemSpacing withMinEdgeInsets:self.minEdgeInsets andCenteredGrid:self.centerGrid];
+    UIEdgeInsets minEdgeInsets = self.minEdgeInsets;
+    
+    if (self.gridHeaderView) {
+        minEdgeInsets.top += CGRectGetHeight(self.gridHeaderView.frame);
+    }
+    
+    [self.layoutStrategy setupItemSize:_itemSize andItemSpacing:self.itemSpacing withMinEdgeInsets:minEdgeInsets andCenteredGrid:self.centerGrid];
     [self.layoutStrategy rebaseWithItemCount:_numberTotalItems insideOfBounds:self.bounds];
     
     CGSize contentSize = [self.layoutStrategy contentSize];
@@ -1294,6 +1319,26 @@ static const UIViewAnimationOptions kDefaultAnimationOptions = UIViewAnimationOp
         }
     }
     
+}
+
+- (void)relayoutGridHeaderView:(BOOL)animated;
+{
+    CGRect frame = CGRectMake(0.0, 0.0, self.bounds.size.width, CGRectGetHeight(self.gridHeaderView.frame));
+    
+    if (animated) {
+        
+        [UIView animateWithDuration:kDefaultAnimationDuration 	
+                              delay:0
+                            options:kDefaultAnimationOptions
+                         animations:^{
+                             self.gridHeaderView.frame = frame;
+                         }
+                         completion:nil];
+        
+    } else {
+        
+        self.gridHeaderView.frame = frame;
+    }
 }
 
 - (void)relayoutItemsAnimated:(BOOL)animated
